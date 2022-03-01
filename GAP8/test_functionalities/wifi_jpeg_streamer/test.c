@@ -25,6 +25,8 @@ static pi_buffer_t buffer2;
 static volatile int stream1_done;
 static volatile int stream2_done;
 
+static uint8_t counter = 0;
+
 static void streamer_handler(void *arg);
 
 
@@ -40,14 +42,22 @@ static void cam_handler(void *arg)
   return;
 }
 
-
+static void update_exposure(void *arg){
+  pi_camera_capture_async(&camera, imgBuff0, CAM_WIDTH*CAM_HEIGHT, pi_task_callback(&task1, cam_handler, NULL));
+}
 
 static void streamer_handler(void *arg)
 {
   *(int *)arg = 1;
   if (stream1_done) // && stream2_done)
   {
-    pi_camera_capture_async(&camera, imgBuff0, CAM_WIDTH*CAM_HEIGHT, pi_task_callback(&task1, cam_handler, NULL));
+    counter++;
+    if(counter % 5 == 0){
+      // Read 324x324 from the camera to force it to update the exposure
+      pi_camera_capture_async(&camera, imgBuff0, 324*324, pi_task_callback(&task1, update_exposure, NULL));
+    }else{
+      pi_camera_capture_async(&camera, imgBuff0, CAM_WIDTH*CAM_HEIGHT, pi_task_callback(&task1, cam_handler, NULL));
+    }
     pi_camera_control(&camera, PI_CAMERA_CMD_START, 0);
   }
 }
@@ -172,7 +182,7 @@ int main()
 
   pi_task_push_delayed_us(pi_task_callback(&led_task, led_handle, NULL), 500000);
 
-  imgBuff0 = (unsigned char *)pmsis_l2_malloc((CAM_WIDTH*CAM_HEIGHT)*sizeof(unsigned char));
+  imgBuff0 = (unsigned char *)pmsis_l2_malloc((324*324)*sizeof(unsigned char));
   if (imgBuff0 == NULL) {
       printf("Failed to allocate Memory for Image \n");
       return 1;
